@@ -1,4 +1,14 @@
 require('dotenv').config();
+
+// Vercel: write Google credentials from env variable to /tmp file
+const fs = require('fs');
+const path = require('path');
+if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    const credentialsPath = path.join('/tmp', 'google-credentials.json');
+    fs.writeFileSync(credentialsPath, process.env.GOOGLE_CREDENTIALS_JSON);
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+}
+
 const express = require('express');
 const { getGoogleAuth, updateCalendarEventColor } = require('./services/googleCalendar');
 const { setupCronJobs } = require('./jobs/cron');
@@ -62,6 +72,12 @@ app.post('/webhook', async (req, res) => {
             }
         }
     }
+});
+
+app.get('/api/cron', (req, res) => {
+    // Aquí va la lógica que tenías en el cronjob
+    setupCronJobs();
+    res.sendStatus(200);
 });
 
 // Start the server
