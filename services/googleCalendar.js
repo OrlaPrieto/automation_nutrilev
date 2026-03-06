@@ -21,9 +21,6 @@ async function getTomorrowsEvents(auth) {
         orderBy: 'startTime',
     });
 
-
-    console.log('response.data', response.data);
-
     return response.data.items;
 }
 
@@ -47,11 +44,26 @@ async function updateCalendarEventColor(eventId, colorId, auth) {
 
 /**
  * Initialize Google Auth using a Service Account.
+ * Supports both file-based credentials (local dev) and
+ * JSON env var credentials (Vercel / serverless).
  */
 function getGoogleAuth() {
+    const scopes = ['https://www.googleapis.com/auth/calendar'];
+
+    // If GOOGLE_CREDENTIALS_JSON is set (Vercel), parse it and use it directly
+    if (process.env.GOOGLE_CREDENTIALS_JSON) {
+        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+        const auth = new google.auth.GoogleAuth({
+            credentials,
+            scopes,
+        });
+        return auth;
+    }
+
+    // Fallback: local dev with keyFile
     const auth = new google.auth.GoogleAuth({
         keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        scopes: ['https://www.googleapis.com/auth/calendar'],
+        scopes,
     });
     return auth;
 }
