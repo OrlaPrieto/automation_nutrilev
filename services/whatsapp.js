@@ -15,14 +15,24 @@ const BASE_URL = process.env.BASE_URL || 'https://automation-nutrilev.vercel.app
  * @returns {string} Google Calendar invite link.
  */
 function generateCalendarLink(event) {
-    const start = (event.start.dateTime || event.start.date).replace(/[-:]/g, '').replace('.000Z', 'Z');
-    const end = (event.end.dateTime || event.end.date).replace(/[-:]/g, '').replace('.000Z', 'Z');
+    // Format date to Google Calendar format: YYYYMMDDTHHmmss (local time, no UTC conversion)
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        return dateStr
+            .replace(/[-:]/g, '')
+            .replace(/\.\d{3}Z$/, '')
+            .replace(/\+\d{4}$/, '')
+            .replace(/Z$/, '');
+    }
+
+    const start = formatDate(event.start.dateTime || event.start.date);
+    const end = formatDate(event.end.dateTime || event.end.date);
 
     const params = new URLSearchParams({
         action: 'TEMPLATE',
         text: event.summary || 'Cita',
         dates: `${start}/${end}`,
-        details: event.description || '',
+        details: '',
         location: event.location || ''
     });
 
