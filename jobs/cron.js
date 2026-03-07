@@ -30,7 +30,8 @@ function setupCronJobs() {
                 console.log(`Event: ${patientName}, Phone: ${phoneNumber}, Location: ${event.location}`);
 
                 if (phoneNumber && phoneNumber.startsWith('+')) {
-                    console.log(`Sending reminder to ${patientName} at ${phoneNumber}...`);
+                    console.log(`Would send reminder to ${patientName} at ${phoneNumber}...`);
+                    // SMS sending commented out to avoid charges
                     // await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
                 } else {
                     console.warn(`Missing or invalid phone number for event: ${event.summary}`);
