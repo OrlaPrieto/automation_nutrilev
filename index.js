@@ -120,5 +120,5 @@ app.get('/api/cron', async (req, res) => {
 // Start the server
 app.listen(PORT, () => {
     console.log(`Webhook server is listening on port ${PORT}`);
-    setupCronJobs();
+    // setupCronJobs();
 });
