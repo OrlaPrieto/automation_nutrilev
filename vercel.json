@@ -1,15 +1,21 @@
 {
     "version": 2,
-    "rewrites": [
+    "builds": [
         {
-            "source": "/webhook",
-            "destination": "/api/webhook"
+            "src": "server.js",
+            "use": "@vercel/node"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "server.js"
         }
     ],
     "crons": [
         {
             "path": "/api/cron",
-            "schedule": "0 14 * * *"
+            "schedule": "0 15 * * *"
         }
     ]
 }
