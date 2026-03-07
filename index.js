@@ -117,6 +117,12 @@ app.get('/api/cron', async (req, res) => {
     }
 });
 
+
+app.get('/api/test', (req, res) => {
+    console.log('TEST ENDPOINT CALLED - no messages sent');
+    res.status(200).send('Test OK');
+});
+
 // Start the server
 app.listen(PORT, () => {
     console.log(`Webhook server is listening on port ${PORT}`);
