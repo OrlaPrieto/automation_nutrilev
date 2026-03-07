@@ -24,8 +24,7 @@ module.exports = async function handler(req, res) {
             // Phone number is stored in Description, location has the address
             const phoneNumber = event.description;
             const patientName = event.summary;
-            const startTime = moment(event.start.dateTime || event.start.date).format('HH:mm');
-
+            const startTime = moment(event.start.dateTime || event.start.date).utcOffset('-06:00').format('HH:mm');
             console.log(`Event: ${patientName}, Phone: ${phoneNumber}, Location: ${event.location}`);
 
             if (phoneNumber && phoneNumber.startsWith('+')) {
