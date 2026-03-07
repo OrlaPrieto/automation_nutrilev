@@ -1,30 +1,33 @@
 const twilio = require('twilio');
+const { Redis } = require('@upstash/redis');
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
-const BASE_URL = process.env.BASE_URL || 'https://tu-proyecto.vercel.app';
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN
+});
 
 /**
- * Send a WhatsApp reminder message to a patient via Twilio template.
+ * Send a WhatsApp reminder message to a patient via Twilio Quick Reply template.
+ * Saves the eventId in Redis associated to the patient's phone number.
  * @param {string} phoneNumber Patient's phone number in international format (e.g. +521234567890).
  * @param {string} patientName Patient's name.
  * @param {string} time Appointment time.
  * @param {string} eventId Google Calendar event ID.
  */
 async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId) {
-    const confirmUrl = `${BASE_URL}/webhook/action?action=CONFIRM&eventId=${eventId}`;
-    const cancelUrl = `${BASE_URL}/webhook/action?action=CANCEL&eventId=${eventId}`;
-
     try {
+        // Save eventId in Redis associated to phone number, expires in 24 hours
+        await redis.set(`cita:${phoneNumber}`, eventId, { ex: 86400 });
+        console.log(`Saved eventId ${eventId} for ${phoneNumber} in Redis`);
+
         const response = await client.messages.create({
             from: process.env.TWILIO_PHONE_NUMBER,
             to: `whatsapp:${phoneNumber}`,
-            contentSid: 'HXaaae8d63594a8a1521c4c5672cde94ac',
+            contentSid: 'HX0d5c68fc8aa9d35f81c691f6f1ca8654',
             contentVariables: JSON.stringify({
                 "1": patientName,
-                "2": time,
-                "3": confirmUrl,
-                "4": cancelUrl
+                "2": time
             })
         });
 
@@ -37,5 +40,6 @@ async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId) {
 }
 
 module.exports = {
-    sendWhatsAppTemplate
+    sendWhatsAppTemplate,
+    redis
 };

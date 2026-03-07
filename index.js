@@ -12,6 +12,7 @@ if (process.env.GOOGLE_CREDENTIALS_JSON) {
 const express = require('express');
 const { getGoogleAuth, updateCalendarEventColor } = require('./services/googleCalendar');
 const { setupCronJobs } = require('./jobs/cron');
+const { redis } = require('./services/whatsapp');
 
 const app = express();
 app.use(express.json());
@@ -39,47 +40,45 @@ app.get('/webhook', (req, res) => {
 });
 
 /**
- * Handle confirm/cancel actions via link click.
- * Links are sent in the WhatsApp message body.
+ * Handle Twilio incoming messages and Quick Reply button clicks (POST).
  */
-app.get('/webhook/action', async (req, res) => {
-    const { action, eventId } = req.query;
-
-    if (!action || !eventId) {
-        return res.status(400).send('Missing action or eventId');
-    }
-
-    console.log(`Received action: ${action} for eventId: ${eventId}`);
-
-    try {
-        const auth = getGoogleAuth();
-
-        if (action === 'CONFIRM') {
-            await updateCalendarEventColor(eventId, '2', auth); // Green
-            console.log(`Event ${eventId} updated to CONFIRMED (Green).`);
-            res.send('✅ Tu cita ha sido confirmada. ¡Hasta pronto!');
-        } else if (action === 'CANCEL') {
-            await updateCalendarEventColor(eventId, '11', auth); // Red
-            console.log(`Event ${eventId} updated to CANCELLED (Red).`);
-            res.send('❌ Tu cita ha sido cancelada. Si deseas reagendar, contáctanos.');
-        } else {
-            res.status(400).send('Invalid action');
-        }
-    } catch (error) {
-        console.error('Error processing action:', error);
-        res.status(500).send('Ocurrió un error. Por favor intenta de nuevo.');
-    }
-});
-
-/**
- * Twilio incoming message webhook (POST).
- * Optional: handle replies from patients via WhatsApp.
- */
-app.post('/webhook', async (req, res) => {
+app.post('/webhook/twilio', async (req, res) => {
     res.sendStatus(200);
 
     const body = req.body;
     console.log('Twilio webhook received:', JSON.stringify(body, null, 2));
+
+    const buttonText = body.ButtonText?.toLowerCase().trim();
+    const phoneNumber = body.From?.replace('whatsapp:', '');
+
+    if (!buttonText || !phoneNumber) return;
+
+    // Get eventId from Redis using phone number
+    const eventId = await redis.get(`cita:${phoneNumber}`);
+    if (!eventId) {
+        console.warn(`No eventId found in Redis for ${phoneNumber}`);
+        return;
+    }
+
+    console.log(`Received "${buttonText}" from ${phoneNumber} for eventId ${eventId}`);
+
+    try {
+        const auth = getGoogleAuth();
+
+        if (buttonText.includes('confirmar')) {
+            await updateCalendarEventColor(eventId, '2', auth); // Green
+            console.log(`Event ${eventId} updated to CONFIRMED (Green).`);
+            // Delete from Redis after processing
+            await redis.del(`cita:${phoneNumber}`);
+        } else if (buttonText.includes('cancelar')) {
+            await updateCalendarEventColor(eventId, '11', auth); // Red
+            console.log(`Event ${eventId} updated to CANCELLED (Red).`);
+            // Delete from Redis after processing
+            await redis.del(`cita:${phoneNumber}`);
+        }
+    } catch (error) {
+        console.error('Error processing button click:', error);
+    }
 });
 
 // Cron job endpoint for Vercel

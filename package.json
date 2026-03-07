@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/OrlaPrieto/automation_nutrilev#readme",
   "dependencies": {
+    "@upstash/redis": "^1.36.3",
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
