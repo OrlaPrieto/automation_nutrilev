@@ -7,7 +7,6 @@ const { sendWhatsAppTemplate } = require('../services/whatsapp');
  * Scheduled task to send appointment reminders for tomorrow.
  */
 function setupCronJobs() {
-    // Execute every minute for testing/confirmation
     const schedule = process.env.CRON_SCHEDULE || '* * * * *';
 
     cron.schedule(schedule, async () => {
@@ -23,14 +22,15 @@ function setupCronJobs() {
             }
 
             for (const event of events) {
-                // The phone number should be in the Description or Location field.
-                const phoneNumber = event.description || event.location;
+                // Phone number is stored in Description, location has the address
+                const phoneNumber = event.description;
                 const patientName = event.summary;
                 const startTime = moment(event.start.dateTime || event.start.date).format('HH:mm');
 
+                console.log(`Event: ${patientName}, Phone: ${phoneNumber}, Location: ${event.location}`);
+
                 if (phoneNumber && phoneNumber.startsWith('+')) {
                     console.log(`Sending reminder to ${patientName} at ${phoneNumber}...`);
-                    // Pass full event object for calendar link generation
                     await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
                 } else {
                     console.warn(`Missing or invalid phone number for event: ${event.summary}`);
