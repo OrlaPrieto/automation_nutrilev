@@ -7,34 +7,61 @@ const redis = new Redis({
     token: process.env.UPSTASH_REDIS_REST_TOKEN
 });
 
+const BASE_URL = process.env.BASE_URL || 'https://tu-proyecto.vercel.app';
+
 /**
- * Send a WhatsApp reminder message to a patient via Twilio Quick Reply template.
- * Saves the eventId in Redis associated to the patient's phone number.
+ * Send a reminder message to a patient via SMS or WhatsApp depending on MESSAGE_CHANNEL env variable.
  * @param {string} phoneNumber Patient's phone number in international format (e.g. +521234567890).
  * @param {string} patientName Patient's name.
  * @param {string} time Appointment time.
  * @param {string} eventId Google Calendar event ID.
  */
 async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId) {
+    const channel = process.env.MESSAGE_CHANNEL || 'whatsapp';
+
     try {
-        // Save eventId in Redis associated to phone number, expires in 24 hours
-        await redis.set(`cita:${phoneNumber}`, eventId, { ex: 86400 });
-        console.log(`Saved eventId ${eventId} for ${phoneNumber} in Redis`);
+        let response;
 
-        const response = await client.messages.create({
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: `whatsapp:${phoneNumber}`,
-            contentSid: process.env.TWILIO_TEMPLATE_SID,
-            contentVariables: JSON.stringify({
-                "1": patientName,
-                "2": time
-            })
-        });
+        if (channel === 'sms') {
+            // SMS mode: send plain text message with confirm/cancel links
+            const confirmUrl = `${BASE_URL}/webhook/action?action=CONFIRM&eventId=${eventId}`;
+            const cancelUrl = `${BASE_URL}/webhook/action?action=CANCEL&eventId=${eventId}`;
 
-        console.log(`Message sent to ${phoneNumber}, SID: ${response.sid}`);
+            const message =
+                `Hola ${patientName}, te recordamos que tienes una cita mañana a las ${time}.\n\n` +
+                `Confirmar: ${confirmUrl}\n` +
+                `Cancelar: ${cancelUrl}`;
+
+            response = await client.messages.create({
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: phoneNumber, // SMS no lleva prefijo whatsapp:
+                body: message
+            });
+
+            console.log(`SMS sent to ${phoneNumber}, SID: ${response.sid}`);
+
+        } else {
+            // WhatsApp mode: use approved template with Quick Reply buttons
+            // Save eventId in Redis associated to phone number, expires in 24 hours
+            await redis.set(`cita:${phoneNumber}`, eventId, { ex: 86400 });
+            console.log(`Saved eventId ${eventId} for ${phoneNumber} in Redis`);
+
+            response = await client.messages.create({
+                from: process.env.TWILIO_PHONE_NUMBER,
+                to: `whatsapp:${phoneNumber}`,
+                contentSid: process.env.TWILIO_TEMPLATE_SID,
+                contentVariables: JSON.stringify({
+                    "1": patientName,
+                    "2": time
+                })
+            });
+
+            console.log(`WhatsApp message sent to ${phoneNumber}, SID: ${response.sid}`);
+        }
+
         return response;
     } catch (error) {
-        console.error('Error sending WhatsApp message:', error.message);
+        console.error('Error sending message:', error.message);
         throw error;
     }
 }
