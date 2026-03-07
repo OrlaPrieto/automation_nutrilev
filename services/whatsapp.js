@@ -7,7 +7,7 @@ const redis = new Redis({
     token: process.env.UPSTASH_REDIS_REST_TOKEN
 });
 
-const BASE_URL = process.env.BASE_URL || 'https://tu-proyecto.vercel.app';
+const BASE_URL = process.env.BASE_URL || 'https://automation-nutrilev.vercel.app';
 
 /**
  * Generate a Google Calendar invite link for the event.
@@ -30,12 +30,13 @@ function generateCalendarLink(event) {
 }
 
 /**
- * Send a reminder message to a patient via SMS or WhatsApp depending on MESSAGE_CHANNEL env variable.
- * @param {string} phoneNumber Patient's phone number in international format (e.g. +521234567890).
+ * Send a reminder message to a patient via SMS or WhatsApp.
+ * Controlled by MESSAGE_CHANNEL env variable: 'sms' or 'whatsapp'
+ * @param {string} phoneNumber Patient's phone number (e.g. +521234567890).
  * @param {string} patientName Patient's name.
  * @param {string} time Appointment time.
  * @param {string} eventId Google Calendar event ID.
- * @param {object} event Full Google Calendar event object (used to generate calendar link).
+ * @param {object} event Full Google Calendar event object.
  */
 async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId, event) {
     const channel = process.env.MESSAGE_CHANNEL || 'whatsapp';
@@ -44,12 +45,7 @@ async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId, eve
         let response;
 
         if (channel === 'sms') {
-            // SMS mode: send plain text message with calendar link
-
-            console.log('Event data:', JSON.stringify(event, null, 2)); // Log temporal
             const calendarLink = event ? generateCalendarLink(event) : null;
-            console.log('Calendar link generated:', calendarLink); // Log temporal
-
             const message =
                 `Hola ${patientName}, te recordamos que tienes una cita mañana a las ${time}.\n\n` +
                 (calendarLink ? `Agregar a tu calendario: ${calendarLink}` : '');
@@ -63,8 +59,7 @@ async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId, eve
             console.log(`SMS sent to ${phoneNumber}, SID: ${response.sid}`);
 
         } else {
-            // WhatsApp mode: use approved template with Quick Reply buttons
-            // Save eventId in Redis associated to phone number, expires in 24 hours
+            // WhatsApp mode: save eventId in Redis, send template with Quick Reply buttons
             await redis.set(`cita:${phoneNumber}`, eventId, { ex: 86400 });
             console.log(`Saved eventId ${eventId} for ${phoneNumber} in Redis`);
 

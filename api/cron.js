@@ -3,7 +3,6 @@ const { getGoogleAuth, getTomorrowsEvents } = require('../services/googleCalenda
 const { sendWhatsAppTemplate } = require('../services/whatsapp');
 
 module.exports = async function handler(req, res) {
-    // Only allow POST (Vercel Cron invokes via GET, but we also accept POST)
     if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).send('Method Not Allowed');
     }
@@ -22,14 +21,17 @@ module.exports = async function handler(req, res) {
         const results = [];
 
         for (const event of events) {
-            const phoneNumber = event.description || event.location;
+            // Phone number is stored in Description, location has the address
+            const phoneNumber = event.description;
             const patientName = event.summary;
             const startTime = moment(event.start.dateTime || event.start.date).format('HH:mm');
 
+            console.log(`Event: ${patientName}, Phone: ${phoneNumber}, Location: ${event.location}`);
+
             if (phoneNumber && phoneNumber.startsWith('+')) {
                 console.log(`Sending reminder to ${patientName} at ${phoneNumber}...`);
-                await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id);
-                results.push({ patient: patientName, status: 'sent' });
+                await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
+                results.push({ patient: patientName, phone: phoneNumber, status: 'sent' });
             } else {
                 console.warn(`Missing or invalid phone number for event: ${event.summary}`);
                 results.push({ patient: patientName, status: 'skipped - no valid phone' });
