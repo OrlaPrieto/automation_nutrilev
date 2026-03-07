@@ -1,56 +1,35 @@
-const axios = require('axios');
+const twilio = require('twilio');
+
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 /**
- * Send a WhatsApp Message Template to a patient.
- * @param {string} phoneNumber Patient's phone number in international format.
- * @param {string} patientName Patient's name for the template.
- * @param {string} time Appointment time for the template.
- * @param {string} eventId Google Calendar event ID to be included in the button payload.
+ * Send a WhatsApp reminder message to a patient via Twilio.
+ * @param {string} phoneNumber Patient's phone number in international format (e.g. +521234567890).
+ * @param {string} patientName Patient's name.
+ * @param {string} time Appointment time.
+ * @param {string} eventId Google Calendar event ID.
  */
 async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId) {
-    const url = `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const confirmUrl = `https://tu-proyecto.vercel.app/webhook/action?action=CONFIRM&eventId=${eventId}`;
+    const cancelUrl = `https://tu-proyecto.vercel.app/webhook/action?action=CANCEL&eventId=${eventId}`;
 
-    const payload = {
-        messaging_product: "whatsapp",
-        to: phoneNumber,
-        type: "template",
-        template: {
-            name: process.env.WHATSAPP_TEMPLATE_NAME || "recordatorio_cita",
-            language: { code: "es_MX" },
-            components: [
-                {
-                    type: "body",
-                    parameters: [
-                        { type: "text", text: patientName },
-                        { type: "text", text: time }
-                    ]
-                },
-                {
-                    type: "button",
-                    sub_type: "quick_reply",
-                    index: "0",
-                    parameters: [{ type: "payload", payload: `CONFIRM_${eventId}` }]
-                },
-                {
-                    type: "button",
-                    sub_type: "quick_reply",
-                    index: "1",
-                    parameters: [{ type: "payload", payload: `CANCEL_${eventId}` }]
-                }
-            ]
-        }
-    };
+    const message =
+        `Hola ${patientName} 👋, te recordamos que tienes una cita mañana a las *${time}*.\n\n` +
+        `¿Confirmas tu asistencia?\n\n` +
+        `✅ Confirmar: ${confirmUrl}\n` +
+        `❌ Cancelar: ${cancelUrl}`;
 
     try {
-        const response = await axios.post(url, payload, {
-            headers: {
-                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json'
-            }
+        const response = await client.messages.create({
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: `whatsapp:${phoneNumber}`,
+            body: message
         });
-        return response.data;
+
+        console.log(`Message sent to ${phoneNumber}, SID: ${response.sid}`);
+        return response;
     } catch (error) {
-        console.error('Error sending WhatsApp message:', error.response ? error.response.data : error.message);
+        console.error('Error sending WhatsApp message:', error.message);
         throw error;
     }
 }

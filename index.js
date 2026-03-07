@@ -15,12 +15,13 @@ const { setupCronJobs } = require('./jobs/cron');
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // Required for Twilio webhooks
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 
 /**
- * WhatsApp Webhook verification (GET).
+ * WhatsApp Webhook verification (GET) - kept for Meta compatibility.
  */
 app.get('/webhook', (req, res) => {
     const mode = req.query['hub.mode'];
@@ -38,44 +39,51 @@ app.get('/webhook', (req, res) => {
 });
 
 /**
- * Handle incoming WhatsApp messages and button clicks (POST).
+ * Handle confirm/cancel actions via link click.
+ * Links are sent in the WhatsApp message body.
  */
-app.post('/webhook', async (req, res) => {
-    // Acknowledge receipt immediately
-    res.sendStatus(200);
+app.get('/webhook/action', async (req, res) => {
+    const { action, eventId } = req.query;
 
-    const body = req.body;
-    if (body.object === 'whatsapp_business_account') {
-        const changes = body.entry?.[0]?.changes?.[0]?.value;
-        const message = changes?.messages?.[0];
+    if (!action || !eventId) {
+        return res.status(400).send('Missing action or eventId');
+    }
 
-        // Check if it's an interactive button click
-        if (message?.type === 'button') {
-            const payload = message.button.payload; // e.g., CONFIRM_eventId
-            const [action, eventId] = payload.split('_');
+    console.log(`Received action: ${action} for eventId: ${eventId}`);
 
-            console.log(`Received action: ${action} for eventId: ${eventId}`);
+    try {
+        const auth = getGoogleAuth();
 
-            try {
-                const auth = getGoogleAuth();
-                if (action === 'CONFIRM') {
-                    // 2 = Green (Confirmed)
-                    await updateCalendarEventColor(eventId, '2', auth);
-                    console.log(`Event ${eventId} updated to CONFIRMED (Green).`);
-                } else if (action === 'CANCEL') {
-                    // 11 = Red (Cancelled)
-                    await updateCalendarEventColor(eventId, '11', auth);
-                    console.log(`Event ${eventId} updated to CANCELLED (Red).`);
-                }
-            } catch (error) {
-                console.error(`Error processing webhook action:`, error);
-            }
+        if (action === 'CONFIRM') {
+            await updateCalendarEventColor(eventId, '2', auth); // Green
+            console.log(`Event ${eventId} updated to CONFIRMED (Green).`);
+            res.send('✅ Tu cita ha sido confirmada. ¡Hasta pronto!');
+        } else if (action === 'CANCEL') {
+            await updateCalendarEventColor(eventId, '11', auth); // Red
+            console.log(`Event ${eventId} updated to CANCELLED (Red).`);
+            res.send('❌ Tu cita ha sido cancelada. Si deseas reagendar, contáctanos.');
+        } else {
+            res.status(400).send('Invalid action');
         }
+    } catch (error) {
+        console.error('Error processing action:', error);
+        res.status(500).send('Ocurrió un error. Por favor intenta de nuevo.');
     }
 });
 
+/**
+ * Twilio incoming message webhook (POST).
+ * Optional: handle replies from patients via WhatsApp.
+ */
+app.post('/webhook', async (req, res) => {
+    res.sendStatus(200);
+
+    const body = req.body;
+    console.log('Twilio webhook received:', JSON.stringify(body, null, 2));
+});
+
+// Cron job endpoint for Vercel
 app.get('/api/cron', (req, res) => {
-    // Aquí va la lógica que tenías en el cronjob
     setupCronJobs();
     res.sendStatus(200);
 });
@@ -83,7 +91,5 @@ app.get('/api/cron', (req, res) => {
 // Start the server
 app.listen(PORT, () => {
     console.log(`Webhook server is listening on port ${PORT}`);
-
-    // Initialize scheduled tasks
     setupCronJobs();
 });
