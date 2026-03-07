@@ -24,14 +24,14 @@ function setupCronJobs() {
 
             for (const event of events) {
                 // The phone number should be in the Description or Location field.
-                // We're assuming it's in the description for this example.
                 const phoneNumber = event.description || event.location;
                 const patientName = event.summary;
                 const startTime = moment(event.start.dateTime || event.start.date).format('HH:mm');
 
                 if (phoneNumber && phoneNumber.startsWith('+')) {
                     console.log(`Sending reminder to ${patientName} at ${phoneNumber}...`);
-                    await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id);
+                    // Pass full event object for calendar link generation
+                    await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
                 } else {
                     console.warn(`Missing or invalid phone number for event: ${event.summary}`);
                 }
