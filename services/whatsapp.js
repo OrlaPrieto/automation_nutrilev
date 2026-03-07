@@ -24,7 +24,7 @@ async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId) {
         const response = await client.messages.create({
             from: process.env.TWILIO_PHONE_NUMBER,
             to: `whatsapp:${phoneNumber}`,
-            contentSid: 'HX0d5c68fc8aa9d35f81c691f6f1ca8654',
+            contentSid: process.env.TWILIO_TEMPLATE_SID,
             contentVariables: JSON.stringify({
                 "1": patientName,
                 "2": time
