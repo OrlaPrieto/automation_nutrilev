@@ -45,7 +45,10 @@ async function sendWhatsAppTemplate(phoneNumber, patientName, time, eventId, eve
 
         if (channel === 'sms') {
             // SMS mode: send plain text message with calendar link
+
+            console.log('Event data:', JSON.stringify(event, null, 2)); // Log temporal
             const calendarLink = event ? generateCalendarLink(event) : null;
+            console.log('Calendar link generated:', calendarLink); // Log temporal
 
             const message =
                 `Hola ${patientName}, te recordamos que tienes una cita mañana a las ${time}.\n\n` +
