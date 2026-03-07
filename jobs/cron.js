@@ -31,7 +31,7 @@ function setupCronJobs() {
 
                 if (phoneNumber && phoneNumber.startsWith('+')) {
                     console.log(`Sending reminder to ${patientName} at ${phoneNumber}...`);
-                    await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
+                    // await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
                 } else {
                     console.warn(`Missing or invalid phone number for event: ${event.summary}`);
                 }
