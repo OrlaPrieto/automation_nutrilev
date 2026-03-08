@@ -1,40 +1,11 @@
-const twilio = require('twilio');
-const { Redis } = require('@upstash/redis');
-const { Resend } = require('resend');
+const config = require('../config');
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN
-});
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const BASE_URL = process.env.BASE_URL || 'https://automation-nutrilev.vercel.app';
-
-function generateCalendarLink(event) {
-    function formatDate(dateStr) {
-        if (!dateStr) return '';
-        // Convert to UTC and format as YYYYMMDDTHHmmssZ
-        const date = new Date(dateStr);
-        return date.toISOString()
-            .replace(/[-:]/g, '')
-            .replace(/\.\d{3}/, '');
-    }
-    const start = formatDate(event.start.dateTime || event.start.date);
-    const end = formatDate(event.end.dateTime || event.end.date);
-    const params = new URLSearchParams({
-        action: 'TEMPLATE',
-        text: event.summary || 'Cita',
-        dates: `${start}/${end}`,
-        details: '',
-        location: event.location || ''
-    });
-    return `https://calendar.google.com/calendar/render?${params.toString()}`;
-}
-
-function generateEmailHtml(patientName, time, event, calendarLink, confirmUrl, cancelUrl, whatsappUrl) {
-    const location = event.location || 'Consultorio Nutrilev';
-    const eventTitle = event.summary || 'Cita';
+/**
+ * Generates an HTML email for appointment confirmation.
+ */
+function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, calendarLink, whatsappUrl }) {
+    const location = event?.location || config.clinic.location || 'Consultorio Nutrilev';
+    const eventTitle = event?.summary || 'Cita';
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -46,8 +17,8 @@ function generateEmailHtml(patientName, time, event, calendarLink, confirmUrl, c
 
 <!-- Header -->
 <tr><td style="background-color:#e91e8c;padding:36px 40px;text-align:center;">
-    <h1 style="margin:0 0 4px;color:#ffffff;font-size:30px;font-weight:700;letter-spacing:-0.5px;">Nutrilev</h1>
-    <p style="margin:0;color:#fce4f3;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;">Nutrición Clínica Especializada</p>
+    <h1 style="margin:0 0 4px;color:#ffffff;font-size:30px;font-weight:700;letter-spacing:-0.5px;">${config.clinic.name}</h1>
+    <p style="margin:0;color:#fce4f3;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;">${config.clinic.specialty}</p>
 </td></tr>
 
 <!-- Banner -->
@@ -116,8 +87,8 @@ function generateEmailHtml(patientName, time, event, calendarLink, confirmUrl, c
 
 <!-- Footer -->
 <tr><td style="background-color:#1a1a2e;padding:28px 40px;text-align:center;">
-    <p style="margin:0 0 8px;color:#f9a8d4;font-size:13px;font-weight:600;">Nutrilev Especializada</p>
-    <p style="margin:0 0 4px;color:#e91e8c;font-size:12px;">nutrilev@outlook.es · +52 (614) 395-8598</p>
+    <p style="margin:0 0 8px;color:#f9a8d4;font-size:13px;font-weight:600;">${config.clinic.name} Especializada</p>
+    <p style="margin:0 0 4px;color:#e91e8c;font-size:12px;">${config.clinic.email} · ${config.clinic.phone}</p>
     <p style="margin:12px 0 0;color:#4b5563;font-size:11px;">Este es un recordatorio automático, por favor no respondas este correo.</p>
 </td></tr>
 
@@ -128,58 +99,4 @@ function generateEmailHtml(patientName, time, event, calendarLink, confirmUrl, c
 </html>`;
 }
 
-async function sendWhatsAppTemplate(contact, patientName, time, eventId, event) {
-    const channel = process.env.MESSAGE_CHANNEL || 'whatsapp';
-
-    try {
-        let response;
-
-        if (channel === 'email') {
-            const calendarLink = event ? generateCalendarLink(event) : '#';
-            const confirmUrl = `${BASE_URL}/api/webhook?action=CONFIRM&eventId=${eventId}`;
-            const cancelUrl = `${BASE_URL}/api/webhook?action=CANCEL&eventId=${eventId}`;
-            const whatsappUrl = `https://wa.me/526143958598?text=Hola%2C%20me%20gustar%C3%ADa%20reagendar%20mi%20cita%20del%20d%C3%ADa%20de%20ma%C3%B1ana.`;
-            const html = generateEmailHtml(patientName, time, event, calendarLink, confirmUrl, cancelUrl, whatsappUrl);
-
-            response = await resend.emails.send({
-                from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-                to: contact,
-                subject: `🍎 Nutrilev | Confirma tu cita de mañana`,
-                html
-            });
-            console.log(`Email sent to ${contact}, ID: ${response.id}`);
-
-        } else if (channel === 'sms') {
-            const calendarLink = event ? generateCalendarLink(event) : null;
-            const message =
-                `Hola ${patientName}, te recordamos que tienes una cita mañana a las ${time}.\n\n` +
-                (calendarLink ? `Agregar a tu calendario: ${calendarLink}` : '');
-
-            response = await client.messages.create({
-                from: process.env.TWILIO_PHONE_NUMBER,
-                to: contact,
-                body: message
-            });
-            console.log(`SMS sent to ${contact}, SID: ${response.sid}`);
-
-        } else {
-            await redis.set(`cita:${contact}`, eventId, { ex: 86400 });
-            console.log(`Saved eventId ${eventId} for ${contact} in Redis`);
-
-            response = await client.messages.create({
-                from: process.env.TWILIO_PHONE_NUMBER,
-                to: `whatsapp:${contact}`,
-                contentSid: process.env.TWILIO_TEMPLATE_SID,
-                contentVariables: JSON.stringify({ "1": patientName, "2": time })
-            });
-            console.log(`WhatsApp message sent to ${contact}, SID: ${response.sid}`);
-        }
-
-        return response;
-    } catch (error) {
-        console.error('Error sending message:', error.message);
-        throw error;
-    }
-}
-
-module.exports = { sendWhatsAppTemplate, redis };
+module.exports = { generateEmailHtml };
