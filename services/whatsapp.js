@@ -144,7 +144,7 @@ async function sendWhatsAppTemplate(contact, patientName, time, eventId, event) 
             response = await resend.emails.send({
                 from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
                 to: contact,
-                subject: `Recordatorio: Tu cita es mañana a las ${time}`,
+                subject: `🍎 Nutrilev | Confirma tu cita de mañana`,
                 html
             });
             console.log(`Email sent to ${contact}, ID: ${response.id}`);
