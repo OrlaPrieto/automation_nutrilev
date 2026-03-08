@@ -9,6 +9,8 @@ module.exports = async function handler(req, res) {
 
     console.log(`[${moment().format()}] Running appointment reminders job...`);
 
+    const channel = process.env.MESSAGE_CHANNEL || 'whatsapp';
+
     try {
         const auth = getGoogleAuth();
         const events = await getTomorrowsEvents(auth);
@@ -21,19 +23,24 @@ module.exports = async function handler(req, res) {
         const results = [];
 
         for (const event of events) {
-            // Phone number is stored in Description, location has the address
-            const phoneNumber = event.description;
+            // contact field: phone number for sms/whatsapp, email for email channel
+            const contact = event.description;
             const patientName = event.summary;
             const startTime = moment(event.start.dateTime || event.start.date).utcOffset('-06:00').format('HH:mm');
-            console.log(`Event: ${patientName}, Phone: ${phoneNumber}, Location: ${event.location}`);
 
-            if (phoneNumber && phoneNumber.startsWith('+')) {
-                console.log(`Sending reminder to ${patientName} at ${phoneNumber}...`);
-                await sendWhatsAppTemplate(phoneNumber, patientName, startTime, event.id, event);
-                results.push({ patient: patientName, phone: phoneNumber, status: 'sent' });
+            console.log(`Event: ${patientName}, Contact: ${contact}, Channel: ${channel}`);
+
+            const isValidPhone = contact && contact.startsWith('+');
+            const isValidEmail = contact && contact.includes('@');
+            const isValid = channel === 'email' ? isValidEmail : isValidPhone;
+
+            if (isValid) {
+                console.log(`Sending reminder to ${patientName} at ${contact}...`);
+                await sendWhatsAppTemplate(contact, patientName, startTime, event.id, event);
+                results.push({ patient: patientName, contact, status: 'sent' });
             } else {
-                console.warn(`Missing or invalid phone number for event: ${event.summary}`);
-                results.push({ patient: patientName, status: 'skipped - no valid phone' });
+                console.warn(`Invalid contact for channel "${channel}": ${contact}`);
+                results.push({ patient: patientName, status: `skipped - invalid contact for ${channel}` });
             }
         }
 
