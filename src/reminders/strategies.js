@@ -64,6 +64,26 @@ class EmailStrategy extends ReminderStrategy {
             html,
         });
     }
+
+    async sendUrgent(contact, patientName, time, eventId, event) {
+        const { generateUrgentEmailHtml } = require('../templates/email-urgent');
+        const calendarLink = event ? generateCalendarLink(event) : '#';
+        const whatsappUrl = `https://wa.me/${config.clinic.phone.replace(/\D/g, '')}?text=Hola%2C%20tengo%20un%20contratiempo%20con%20mi%20cita%20de%20hoy.`;
+
+        const html = generateUrgentEmailHtml({
+            patientName,
+            time,
+            event,
+            calendarLink,
+            whatsappUrl,
+        });
+
+        return resend.sendEmail({
+            to: contact,
+            subject: `⏰ Tu cita en ${config.clinic.name} comienza pronto!`,
+            html,
+        });
+    }
 }
 
 module.exports = {
