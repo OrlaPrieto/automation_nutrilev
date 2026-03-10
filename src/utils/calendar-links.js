@@ -16,7 +16,7 @@ function generateCalendarLink(event) {
 
     const params = new URLSearchParams({
         action: 'TEMPLATE',
-        text: event.summary || 'Cita',
+        text: (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim() || 'Cita',
         dates: `${start}/${end}`,
         details: event.description || '',
         location: event.location || ''

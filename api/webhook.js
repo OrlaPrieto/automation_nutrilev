@@ -13,7 +13,20 @@ module.exports = async function handler(req, res) {
         if (action && eventId) {
             console.log(`Received email action: ${action} for eventId: ${eventId}`);
             try {
-                const colorId = action === 'CONFIRM' ? '2' : '11'; // 2=Green, 11=Red
+                let colorId = '11'; // Default cancel (Red)
+                if (action === 'CONFIRM') {
+                    const event = await calendar.getEvent(eventId);
+                    const currentColor = event.colorId;
+                    
+                    // Si Menta (7), cambiar a Morado (3)
+                    // Si Gris (8) u otro, cambiar a Verde Musgo (2)
+                    if (currentColor === '7') {
+                        colorId = '3';
+                    } else {
+                        colorId = '2';
+                    }
+                }
+
                 await calendar.updateEventColor(eventId, colorId);
 
                 const isConfirm = action === 'CONFIRM';
@@ -57,7 +70,15 @@ module.exports = async function handler(req, res) {
             console.log(`Received "${buttonText}" from ${phoneNumber} for eventId ${eventId}`);
 
             if (buttonText.includes('confirmar')) {
-                await calendar.updateEventColor(eventId, '2');
+                const event = await calendar.getEvent(eventId);
+                const currentColor = event.colorId;
+                
+                let colorId = '2'; // Default Verde Musgo
+                if (currentColor === '7') {
+                    colorId = '3'; // Menta -> Morado
+                }
+                
+                await calendar.updateEventColor(eventId, colorId);
                 await redis.del(`cita:${phoneNumber}`);
             } else if (buttonText.includes('cancelar')) {
                 await calendar.updateEventColor(eventId, '11');

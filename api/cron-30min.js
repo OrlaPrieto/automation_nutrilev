@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
 
         for (const event of events) {
             const contact = event.description;
-            const patientName = event.summary;
+            const patientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
             const startTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
                 .format('HH:mm');

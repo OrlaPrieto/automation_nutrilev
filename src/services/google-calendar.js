@@ -53,7 +53,23 @@ async function updateEventColor(eventId, colorId) {
     });
 }
 
+/**
+ * Get a specific event by ID.
+ */
+async function getEvent(eventId) {
+    const auth = getGoogleAuth();
+    const calendar = google.calendar({ version: 'v3', auth });
+
+    const response = await calendar.events.get({
+        calendarId: config.google.calendarId,
+        eventId,
+    });
+
+    return response.data;
+}
+
 module.exports = {
     getEvents,
+    getEvent,
     updateEventColor,
 };

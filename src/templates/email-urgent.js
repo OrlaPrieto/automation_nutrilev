@@ -5,7 +5,14 @@ const config = require('../config');
  */
 function generateUrgentEmailHtml({ patientName, time, event, calendarLink, whatsappUrl }) {
     const location = event?.location || config.clinic.location || 'Consultorio Nutrilev';
-    const eventTitle = event?.summary || 'Cita';
+    const rawSummary = event?.summary || '';
+    const isVirtual = /virtual/i.test(rawSummary);
+    const modality = isVirtual ? 'Virtual' : 'Presencial';
+    
+    const matchSession = rawSummary.match(/(\d+)\/(\d+)/);
+    const sessionText = matchSession ? `Cita ${matchSession[1]} de ${matchSession[2]}` : 'Cita regular';
+    
+    const eventTitle = rawSummary.replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim() || 'Cita';
 
     // Make a Google Maps link search for the location
     const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
@@ -47,7 +54,17 @@ function generateUrgentEmailHtml({ patientName, time, event, calendarLink, whats
     </tr>
     <tr>
         <td style="padding:15px;border-top:1px solid #fce4f3;text-align:center;">
-            <p style="margin:0;color:#6b7280;font-size:14px;">Motivo: <strong style="color:#1a1a2e;">${eventTitle}</strong></p>
+            <p style="margin:0;color:#6b7280;font-size:14px;">Modalidad: <strong style="color:#1a1a2e;">${modality}</strong></p>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding:15px;border-top:1px solid #fce4f3;text-align:center;">
+            <p style="margin:0;color:#6b7280;font-size:14px;">Sesión: <strong style="color:#1a1a2e;">${sessionText}</strong></p>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding:15px;border-top:1px solid #fce4f3;text-align:center;">
+            <p style="margin:0;color:#6b7280;font-size:14px;">Consultante: <strong style="color:#1a1a2e;">${eventTitle}</strong></p>
         </td>
     </tr>
     </table>

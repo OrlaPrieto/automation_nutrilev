@@ -5,7 +5,14 @@ const config = require('../config');
  */
 function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, calendarLink, whatsappUrl }) {
     const location = event?.location || config.clinic.location || 'Consultorio Nutrilev';
-    const eventTitle = event?.summary || 'Cita';
+    const rawSummary = event?.summary || '';
+    const isVirtual = /virtual/i.test(rawSummary);
+    const modality = isVirtual ? 'Virtual' : 'Presencial';
+    
+    const matchSession = rawSummary.match(/(\d+)\/(\d+)/);
+    const sessionText = matchSession ? `Cita ${matchSession[1]} de ${matchSession[2]}` : 'Cita regular';
+
+    const eventTitle = rawSummary.replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim() || 'Cita';
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -37,7 +44,15 @@ function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, ca
         <p style="margin:0 0 16px;color:#e91e8c;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Detalles de tu cita</p>
         <table width="100%" cellpadding="0" cellspacing="0">
             <tr><td style="padding:10px 0;border-bottom:1px solid #fce4f3;">
-                <span style="color:#6b7280;font-size:14px;">📋 Tipo de cita</span>
+                <span style="color:#6b7280;font-size:14px;">🖥 Modalidad</span>
+                <span style="color:#1a1a2e;font-size:14px;font-weight:600;float:right;">${modality}</span>
+            </td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #fce4f3;">
+                <span style="color:#6b7280;font-size:14px;">📅 Sesión</span>
+                <span style="color:#1a1a2e;font-size:14px;font-weight:600;float:right;">${sessionText}</span>
+            </td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #fce4f3;">
+                <span style="color:#6b7280;font-size:14px;">📋 Consultante</span>
                 <span style="color:#1a1a2e;font-size:14px;font-weight:600;float:right;">${eventTitle}</span>
             </td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #fce4f3;">
