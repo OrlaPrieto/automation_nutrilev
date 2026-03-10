@@ -18,12 +18,12 @@ module.exports = async function handler(req, res) {
                     const event = await calendar.getEvent(eventId);
                     const currentColor = event.colorId;
                     
-                    // Si Menta (7), cambiar a Morado (3)
-                    // Si Gris (8) u otro, cambiar a Verde Musgo (2)
-                    if (currentColor === '7') {
+                    // Si Menta '2' (Salvia), cambiar a Morado '3' (Uva)
+                    // Si Gris '8' (Grafito) u otro, cambiar a Verde musgo '10' (Albahaca)
+                    if (currentColor === '2') {
                         colorId = '3';
                     } else {
-                        colorId = '2';
+                        colorId = '10';
                     }
                 }
 
@@ -73,9 +73,9 @@ module.exports = async function handler(req, res) {
                 const event = await calendar.getEvent(eventId);
                 const currentColor = event.colorId;
                 
-                let colorId = '2'; // Default Verde Musgo
-                if (currentColor === '7') {
-                    colorId = '3'; // Menta -> Morado
+                let colorId = '10'; // Default Verde Musgo (Albahaca)
+                if (currentColor === '2') {
+                    colorId = '3'; // Menta (2) -> Morado (3)
                 }
                 
                 await calendar.updateEventColor(eventId, colorId);
