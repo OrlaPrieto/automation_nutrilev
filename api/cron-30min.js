@@ -36,7 +36,14 @@ module.exports = async function handler(req, res) {
         const results = [];
 
         for (const event of events) {
-            const contact = event.description;
+            let contact = event.description;
+            
+            // Fallback to searching attendees if description is empty
+            if (!contact && event.attendees && event.attendees.length > 0) {
+                const nonSelfAttendee = event.attendees.find(a => !a.self && a.email && !a.email.includes('resource.calendar'));
+                if (nonSelfAttendee) contact = nonSelfAttendee.email;
+            }
+
             const patientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
             const startTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
@@ -54,7 +61,16 @@ module.exports = async function handler(req, res) {
 
             const isValid = contact && contact.includes('@');
 
-            if (isValid && typeof strategy.sendUrgent === 'function') {
+            if (!contact) {
+                console.warn(`Skipping event "${patientName}" (${event.id}): No contact info (email) found in description or attendees.`);
+                results.push({ patient: patientName, status: `skipped - no contact info` });
+            } else if (!isValid) {
+                console.warn(`Skipping event "${patientName}" (${event.id}): Invalid contact format for email: "${contact}"`);
+                results.push({ patient: patientName, status: `skipped - invalid contact` });
+            } else if (typeof strategy.sendUrgent !== 'function') {
+                console.warn(`Skipping event "${patientName}" (${event.id}): Configured strategy does not support sendUrgent.`);
+                results.push({ patient: patientName, status: `skipped - missing sendUrgent method` });
+            } else {
                 try {
                     console.log(`Sending urgent 30-min reminder to ${patientName} at ${contact}...`);
                     await strategy.sendUrgent(contact, patientName, startTime, event.id, event);
@@ -67,9 +83,6 @@ module.exports = async function handler(req, res) {
                     console.error(`Failed to send urgent reminder to ${patientName}:`, err.message);
                     results.push({ patient: patientName, contact, status: 'error', error: err.message });
                 }
-            } else {
-                console.warn(`Invalid contact or strategy missing sendUrgent: ${contact}`);
-                results.push({ patient: patientName, status: `skipped - invalid for urgent` });
             }
         }
 

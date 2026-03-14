@@ -28,20 +28,33 @@ module.exports = async function handler(req, res) {
 
         // 3. Process each event
         for (const event of events) {
-            const contact = event.description;
+            let contact = event.description;
+            
+            // Fallback to searching attendees if description is empty
+            if (!contact && event.attendees && event.attendees.length > 0) {
+                const nonSelfAttendee = event.attendees.find(a => !a.self && a.email && !a.email.includes('resource.calendar'));
+                if (nonSelfAttendee) contact = nonSelfAttendee.email;
+            }
+
             const patientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
             const startTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
                 .format('HH:mm');
 
-            console.log(`Processing: ${patientName} (${contact}) via ${config.messageChannel}`);
+            console.log(`Processing: ${patientName} (${contact || 'No contact info'}) via ${config.messageChannel}`);
 
             // Basic validation based on channel
             const isValid = config.messageChannel === 'email'
                 ? (contact && contact.includes('@'))
                 : (contact && contact.startsWith('+'));
 
-            if (isValid) {
+            if (!contact) {
+                console.warn(`Skipping event "${patientName}" (${event.id}): No contact info found in description or attendees.`);
+                results.push({ patient: patientName, status: `skipped - no contact info` });
+            } else if (!isValid) {
+                console.warn(`Skipping event "${patientName}" (${event.id}): Invalid contact format for channel "${config.messageChannel}": "${contact}"`);
+                results.push({ patient: patientName, status: `skipped - invalid contact` });
+            } else {
                 try {
                     await strategy.send(contact, patientName, startTime, event.id, event);
                     results.push({ patient: patientName, contact, status: 'sent' });
@@ -49,9 +62,6 @@ module.exports = async function handler(req, res) {
                     console.error(`Failed to send reminder to ${patientName}:`, err.message);
                     results.push({ patient: patientName, contact, status: 'error', error: err.message });
                 }
-            } else {
-                console.warn(`Invalid contact for channel "${config.messageChannel}": ${contact}`);
-                results.push({ patient: patientName, status: `skipped - invalid contact` });
             }
         }
 
