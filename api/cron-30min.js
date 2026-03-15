@@ -21,9 +21,9 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        // Look for events starting between 25 and 40 minutes from NOW
-        const timeMin = moment().add(25, 'minutes').toISOString();
-        const timeMax = moment().add(40, 'minutes').toISOString();
+        // Look for events starting between 25 and 40 minutes from NOW (Central Time)
+        const timeMin = moment().utcOffset('-06:00').add(25, 'minutes').toISOString();
+        const timeMax = moment().utcOffset('-06:00').add(40, 'minutes').toISOString();
 
         const events = await calendar.getEvents(timeMin, timeMax);
 

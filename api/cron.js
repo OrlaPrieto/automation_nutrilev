@@ -11,9 +11,9 @@ module.exports = async function handler(req, res) {
     console.log(`[${moment().format()}] Running appointment reminders job...`);
 
     try {
-        // 1. Get tomorrow's events
-        const timeMin = moment().add(1, 'days').startOf('day').toISOString();
-        const timeMax = moment().add(1, 'days').endOf('day').toISOString();
+        // 1. Get tomorrow's events (forcing Mexico City time for calculation)
+        const timeMin = moment().utcOffset('-06:00').add(1, 'days').startOf('day').toISOString();
+        const timeMax = moment().utcOffset('-06:00').add(1, 'days').endOf('day').toISOString();
 
         const events = await calendar.getEvents(timeMin, timeMax);
 

@@ -55,9 +55,25 @@ cp .env.example .env
 node index.js
 ```
 
-## 📝 Notas de Implementación
-- El número de teléfono del paciente debe estar en la **Descripción** o **Ubicación** del evento con formato internacional (ej. `+521234567890`).
-- El Cron Job se ejecuta por defecto cada minuto (configurable en `.env`) consultando las citas del día siguiente.
-- Los colores del calendario cambian a:
-  - **Verde (Color ID 2)**: Confirmado.
-  - **Rojo (Color ID 11)**: Cancelado.
+## 📧 Cambio de Cuenta de Correo y Calendario
+
+Si decides cambiar de cuenta de correo o de calendario, sigue estos pasos:
+
+### 1. Cambiar el "Sender" de Email (Resend)
+Si usas **Resend** para enviar correos:
+1. Registra tu nuevo dominio o correo en [Resend Domains](https://resend.com/domains) y verifícalo.
+2. Actualiza la variable `RESEND_API_KEY` en Vercel/.env con la nueva API Key.
+3. Actualiza la variable `CLINIC_EMAIL` o el campo `clinic.email` en `src/config/index.js` con la nueva dirección.
+
+### 2. Cambiar la Cuenta de Google Calendar
+1. En el nuevo calendario de Google, ve a **Configuración y uso compartido**.
+2. En **Compartir con personas específicas**, agrega el email de tu **Cuenta de Servicio** (el que termina en `.iam.gserviceaccount.com`) con permiso de "Realizar cambios en eventos".
+3. Copia el **ID del calendario** (suele ser tu email o una cadena larga terminada en `@group.calendar.google.com`).
+4. Actualiza la variable `GOOGLE_CALENDAR_ID` en Vercel/.env.
+
+### 3. Actualizar Variables de Entorno
+Asegúrate de actualizar estos valores en tu panel de **Vercel** > **Settings** > **Environment Variables** para que los cambios surtan efecto en producción:
+- `CLINIC_EMAIL`: El nuevo correo de contacto.
+- `RESEND_API_KEY`: Si cambias de cuenta de Resend.
+- `GOOGLE_CALENDAR_ID`: El ID del nuevo calendario.
+- `GOOGLE_CREDENTIALS_JSON`: Solo si decides usar una Cuenta de Servicio de un proyecto de Google Cloud diferente.
