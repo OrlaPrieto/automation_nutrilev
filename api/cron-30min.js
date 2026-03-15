@@ -59,30 +59,37 @@ module.exports = async function handler(req, res) {
                 continue;
             }
 
-            const isValid = contact && contact.includes('@');
+            console.log(`[${moment().format('HH:mm:ss')}] Processing urgent: ${patientName} (${contact}) email...`);
 
             if (!contact) {
-                console.warn(`Skipping event "${patientName}" (${event.id}): No contact info (email) found in description or attendees.`);
+                console.warn(`[WARN] Skipping urgent "${patientName}": No email found.`);
                 results.push({ patient: patientName, status: `skipped - no contact info` });
-            } else if (!isValid) {
-                console.warn(`Skipping event "${patientName}" (${event.id}): Invalid contact format for email: "${contact}"`);
+                continue;
+            }
+
+            if (!contact.includes('@')) {
+                console.warn(`[WARN] Skipping urgent "${patientName}": Invalid email format "${contact}"`);
                 results.push({ patient: patientName, status: `skipped - invalid contact` });
-            } else if (typeof strategy.sendUrgent !== 'function') {
-                console.warn(`Skipping event "${patientName}" (${event.id}): Configured strategy does not support sendUrgent.`);
+                continue;
+            }
+
+            if (typeof strategy.sendUrgent !== 'function') {
+                console.warn(`[WARN] Strategy does not support sendUrgent.`);
                 results.push({ patient: patientName, status: `skipped - missing sendUrgent method` });
-            } else {
-                try {
-                    console.log(`Sending urgent 30-min reminder to ${patientName} at ${contact}...`);
-                    await strategy.sendUrgent(contact, patientName, startTime, event.id, event);
+                continue;
+            }
 
-                    // Mark as sent in Redis (expires in 2 hours)
-                    await redis.set(sentKey, 'true', { ex: 7200 });
+            try {
+                const response = await strategy.sendUrgent(contact, patientName, startTime, event.id, event);
+                console.log(`[OK] Sent urgent to ${patientName} (${contact}). Resend ID: ${response?.id || 'N/A'}`);
 
-                    results.push({ patient: patientName, contact, status: 'sent urgent' });
-                } catch (err) {
-                    console.error(`Failed to send urgent reminder to ${patientName}:`, err.message);
-                    results.push({ patient: patientName, contact, status: 'error', error: err.message });
-                }
+                // Mark as sent in Redis (expires in 2 hours)
+                await redis.set(sentKey, 'true', { ex: 7200 });
+
+                results.push({ patient: patientName, contact, status: 'sent urgent', resendId: response?.id });
+            } catch (err) {
+                console.error(`[ERROR] Failed urgent for ${patientName} (${contact}):`, err.message);
+                results.push({ patient: patientName, contact, status: 'error', error: err.message });
             }
         }
 

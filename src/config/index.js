@@ -32,7 +32,8 @@ module.exports = {
 
     resend: {
         apiKey: process.env.RESEND_API_KEY,
-        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        from: process.env.EMAIL_FROM || `${process.env.CLINIC_NAME || 'Nutrilev'} <onboarding@resend.dev>`,
+        replyTo: process.env.CLINIC_EMAIL || 'nutrilev@outlook.es',
     },
 
     clinic: {

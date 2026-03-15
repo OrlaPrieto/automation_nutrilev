@@ -41,27 +41,27 @@ module.exports = async function handler(req, res) {
                 .utcOffset('-06:00')
                 .format('HH:mm');
 
-            console.log(`Processing: ${patientName} (${contact || 'No contact info'}) via ${config.messageChannel}`);
-
-            // Basic validation based on channel
-            const isValid = config.messageChannel === 'email'
-                ? (contact && contact.includes('@'))
-                : (contact && contact.startsWith('+'));
-
+            console.log(`[${moment().format('HH:mm:ss')}] Processing: ${patientName} (${contact || 'No contact info'}) email...`);
+            
             if (!contact) {
-                console.warn(`Skipping event "${patientName}" (${event.id}): No contact info found in description or attendees.`);
+                console.warn(`[WARN] Skipping "${patientName}": No email found.`);
                 results.push({ patient: patientName, status: `skipped - no contact info` });
-            } else if (!isValid) {
-                console.warn(`Skipping event "${patientName}" (${event.id}): Invalid contact format for channel "${config.messageChannel}": "${contact}"`);
+                continue;
+            }
+
+            if (!contact.includes('@')) {
+                console.warn(`[WARN] Skipping "${patientName}": Invalid email format "${contact}"`);
                 results.push({ patient: patientName, status: `skipped - invalid contact` });
-            } else {
-                try {
-                    await strategy.send(contact, patientName, startTime, event.id, event);
-                    results.push({ patient: patientName, contact, status: 'sent' });
-                } catch (err) {
-                    console.error(`Failed to send reminder to ${patientName}:`, err.message);
-                    results.push({ patient: patientName, contact, status: 'error', error: err.message });
-                }
+                continue;
+            }
+
+            try {
+                const response = await strategy.send(contact, patientName, startTime, event.id, event);
+                console.log(`[OK] Sent to ${patientName} (${contact}). Resend ID: ${response?.id || 'N/A'}`);
+                results.push({ patient: patientName, contact, status: 'sent', resendId: response?.id });
+            } catch (err) {
+                console.error(`[ERROR] Failed for ${patientName} (${contact}):`, err.message);
+                results.push({ patient: patientName, contact, status: 'error', error: err.message });
             }
         }
 
