@@ -7,13 +7,19 @@ class ResendService {
     }
 
     async sendEmail({ to, subject, html }) {
-        return this.client.emails.send({
+        const { data, error } = await this.client.emails.send({
             from: config.resend.from,
             to,
             subject,
             html,
             reply_to: config.resend.replyTo,
         });
+
+        if (error) {
+            throw new Error(error.message || 'Error sending email via Resend');
+        }
+
+        return data;
     }
 }
 

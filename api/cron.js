@@ -2,6 +2,7 @@ const moment = require('moment');
 const calendar = require('../src/services/google-calendar');
 const ReminderFactory = require('../src/reminders/factory');
 const config = require('../src/config');
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 module.exports = async function handler(req, res) {
     if (req.method !== 'GET' && req.method !== 'POST') {
@@ -56,6 +57,9 @@ module.exports = async function handler(req, res) {
             }
 
             try {
+                // Add a small delay between sends to avoid rate limits
+                if (results.length > 0) await sleep(500);
+
                 const response = await strategy.send(contact, patientName, startTime, event.id, event);
                 console.log(`[OK] Sent to ${patientName} (${contact}). Resend ID: ${response?.id || 'N/A'}`);
                 results.push({ patient: patientName, contact, status: 'sent', resendId: response?.id });
