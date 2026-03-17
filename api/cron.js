@@ -2,6 +2,7 @@ const moment = require('moment');
 const calendar = require('../src/services/google-calendar');
 const ReminderFactory = require('../src/reminders/factory');
 const config = require('../src/config');
+const { extractEmail } = require('../src/utils/email');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 module.exports = async function handler(req, res) {
@@ -57,12 +58,15 @@ module.exports = async function handler(req, res) {
             }
 
             try {
+                // Clean contact email if it exists
+                const cleanContact = extractEmail(contact);
+
                 // Add a small delay between sends to avoid rate limits
                 if (results.length > 0) await sleep(500);
 
-                const response = await strategy.send(contact, patientName, startTime, event.id, event);
-                console.log(`[OK] Sent to ${patientName} (${contact}). Resend ID: ${response?.id || 'N/A'}`);
-                results.push({ patient: patientName, contact, status: 'sent', resendId: response?.id });
+                const response = await strategy.send(cleanContact || contact, patientName, startTime, event.id, event);
+                console.log(`[OK] Sent to ${patientName} (${cleanContact || contact}). Resend ID: ${response?.id || 'N/A'}`);
+                results.push({ patient: patientName, contact: cleanContact || contact, status: 'sent', resendId: response?.id });
             } catch (err) {
                 console.error(`[ERROR] Failed for ${patientName} (${contact}):`, err.message);
                 results.push({ patient: patientName, contact, status: 'error', error: err.message });

@@ -3,6 +3,7 @@ const calendar = require('../src/services/google-calendar');
 const ReminderFactory = require('../src/reminders/factory');
 const config = require('../src/config');
 const redis = require('../src/services/redis');
+const { extractEmail } = require('../src/utils/email');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 module.exports = async function handler(req, res) {
@@ -81,16 +82,19 @@ module.exports = async function handler(req, res) {
             }
 
             try {
+                // Clean contact email if it exists
+                const cleanContact = extractEmail(contact);
+
                 // Add a small delay between sends to avoid rate limits
                 if (results.length > 0) await sleep(500);
 
-                const response = await strategy.sendUrgent(contact, patientName, startTime, event.id, event);
-                console.log(`[OK] Sent urgent to ${patientName} (${contact}). Resend ID: ${response?.id || 'N/A'}`);
+                const response = await strategy.sendUrgent(cleanContact || contact, patientName, startTime, event.id, event);
+                console.log(`[OK] Sent urgent to ${patientName} (${cleanContact || contact}). Resend ID: ${response?.id || 'N/A'}`);
 
                 // Mark as sent in Redis (expires in 2 hours)
                 await redis.set(sentKey, 'true', { ex: 7200 });
 
-                results.push({ patient: patientName, contact, status: 'sent urgent', resendId: response?.id });
+                results.push({ patient: patientName, contact: cleanContact || contact, status: 'sent urgent', resendId: response?.id });
             } catch (err) {
                 console.error(`[ERROR] Failed urgent for ${patientName} (${contact}):`, err.message);
                 results.push({ patient: patientName, contact, status: 'error', error: err.message });
