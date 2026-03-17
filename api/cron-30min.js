@@ -61,7 +61,7 @@ module.exports = async function handler(req, res) {
                 continue;
             }
 
-            console.log(`[${moment().format('HH:mm:ss')}] Processing urgent: ${patientName} (${contact}) email...`);
+            console.log(`[${moment().format('HH:mm:ss')}] Processing urgent: ${patientName} (${contact}) email... [ID: ${event.id}]`);
 
             if (!contact) {
                 console.warn(`[WARN] Skipping urgent "${patientName}": No email found.`);

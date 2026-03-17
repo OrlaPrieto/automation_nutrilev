@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
                 .utcOffset('-06:00')
                 .format('HH:mm');
 
-            console.log(`[${moment().format('HH:mm:ss')}] Processing: ${patientName} (${contact || 'No contact info'}) email...`);
+            console.log(`[${moment().format('HH:mm:ss')}] Processing: ${patientName} (${contact || 'No contact info'}) email... [ID: ${event.id}]`);
             
             if (!contact) {
                 console.warn(`[WARN] Skipping "${patientName}": No email found.`);
