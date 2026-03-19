@@ -49,7 +49,7 @@ module.exports = async function handler(req, res) {
             const patientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
             const startTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
-                .format('HH:mm');
+                .format('h:mm A');
 
             // Prevent duplicate sends for the same event
             const sentKey = `urgent_sent_${event.id}`;

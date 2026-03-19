@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
             finalPatientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
             finalTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
-                .format('HH:mm');
+                .format('h:mm A');
         }
 
         // Validate required fields
