@@ -72,11 +72,12 @@ module.exports = async function handler(req, res) {
             try {
                 // Clean contact email if it exists
                 const cleanContact = extractEmail(contact);
+                const targetDay = (dayOfWeek === 6) ? 'el lunes' : 'mañana';
 
                 // Add a small delay between sends to avoid rate limits
                 if (results.length > 0) await sleep(500);
 
-                const response = await strategy.send(cleanContact || contact, patientName, startTime, event.id, event);
+                const response = await strategy.send(cleanContact || contact, patientName, startTime, event.id, event, targetDay);
                 console.log(`[OK] Sent to ${patientName} (${cleanContact || contact}). Resend ID: ${response?.id || 'N/A'}`);
                 results.push({ patient: patientName, contact: cleanContact || contact, status: 'sent', resendId: response?.id });
             } catch (err) {

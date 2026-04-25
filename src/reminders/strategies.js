@@ -9,7 +9,7 @@ const { generateCalendarLink } = require('../utils/calendar-links');
  * Base Reminder Strategy
  */
 class ReminderStrategy {
-    async send(contact, patientName, time, eventId, event) {
+    async send(contact, patientName, time, eventId, event, targetDay = 'mañana') {
         throw new Error('Strategy must implement send()');
     }
 }
@@ -18,7 +18,7 @@ class ReminderStrategy {
  * WhatsApp Strategy (via Twilio)
  */
 class WhatsAppStrategy extends ReminderStrategy {
-    async send(contact, patientName, time, eventId) {
+    async send(contact, patientName, time, eventId, event, targetDay = 'mañana') {
         // Store eventId in Redis for webhook lookup
         await redis.set(`cita:${contact}`, eventId, { ex: 86400 });
         return twilio.sendWhatsApp(contact, patientName, time);
@@ -29,9 +29,9 @@ class WhatsAppStrategy extends ReminderStrategy {
  * SMS Strategy (via Twilio)
  */
 class SMSStrategy extends ReminderStrategy {
-    async send(contact, patientName, time, _, event) {
+    async send(contact, patientName, time, _, event, targetDay = 'mañana') {
         const calendarLink = event ? generateCalendarLink(event) : '';
-        const message = `Hola ${patientName}, te recordamos que tienes una cita mañana a las ${time}.\n\n` +
+        const message = `Hola ${patientName}, te recordamos que tienes una cita ${targetDay} a las ${time}.\n\n` +
             (calendarLink ? `Agregar a tu calendario: ${calendarLink}` : '');
 
         return twilio.sendSMS(contact, message);
@@ -42,7 +42,7 @@ class SMSStrategy extends ReminderStrategy {
  * Email Strategy (via Resend)
  */
 class EmailStrategy extends ReminderStrategy {
-    async send(contact, patientName, time, eventId, event) {
+    async send(contact, patientName, time, eventId, event, targetDay = 'mañana') {
         const calendarLink = event ? generateCalendarLink(event) : '#';
         const confirmUrl = `${config.baseUrl}/api/webhook?action=CONFIRM&eventId=${eventId}`;
         const cancelUrl = `${config.baseUrl}/api/webhook?action=CANCEL&eventId=${eventId}`;
@@ -56,11 +56,12 @@ class EmailStrategy extends ReminderStrategy {
             cancelUrl,
             calendarLink,
             whatsappUrl,
+            targetDay,
         });
 
         return resend.sendEmail({
             to: contact,
-            subject: `🍎 ${config.clinic.name} | Confirma tu cita de mañana`,
+            subject: `🍎 ${config.clinic.name} | Confirma tu cita de ${targetDay}`,
             html,
         });
     }

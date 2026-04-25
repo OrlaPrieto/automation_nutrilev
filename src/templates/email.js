@@ -3,7 +3,7 @@ const config = require('../config');
 /**
  * Generates an HTML email for appointment confirmation.
  */
-function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, calendarLink, whatsappUrl }) {
+function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, calendarLink, whatsappUrl, targetDay = 'mañana' }) {
     const location = event?.location || config.clinic.location || 'Consultorio Nutrilev';
     const rawSummary = event?.summary || '';
     const isVirtual = /virtual/i.test(rawSummary);
@@ -30,13 +30,13 @@ function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, ca
 
 <!-- Banner -->
 <tr><td style="background-color:#fce4f3;padding:18px 40px;text-align:center;border-bottom:1px solid #f9a8d4;">
-    <p style="margin:0;color:#9d174d;font-size:14px;font-weight:600;">🌸 Recordatorio de Cita — Te esperamos mañana</p>
+    <p style="margin:0;color:#9d174d;font-size:14px;font-weight:600;">🌸 Recordatorio de Cita — Te esperamos ${targetDay}</p>
 </td></tr>
 
 <!-- Body -->
 <tr><td style="padding:40px;">
     <p style="margin:0 0 8px;color:#1a1a2e;font-size:18px;font-weight:600;">Hola, ${patientName} 👋</p>
-    <p style="margin:0 0 32px;color:#6b7280;font-size:15px;line-height:1.7;">Te recordamos que tienes una cita programada para mañana. Aquí están los detalles:</p>
+    <p style="margin:0 0 32px;color:#6b7280;font-size:15px;line-height:1.7;">Te recordamos que tienes una cita programada para ${targetDay}. Aquí están los detalles:</p>
 
     <!-- Detalles -->
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fff0f5;border-radius:12px;border:1px solid #f9a8d4;margin-bottom:32px;">
