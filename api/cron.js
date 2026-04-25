@@ -14,8 +14,20 @@ module.exports = async function handler(req, res) {
 
     try {
         // 1. Get tomorrow's events (forcing Mexico City time for calculation)
-        const timeMin = moment().utcOffset('-06:00').add(1, 'days').startOf('day').toISOString();
-        const timeMax = moment().utcOffset('-06:00').add(1, 'days').endOf('day').toISOString();
+        // 1. Determine target date (Monday reminders are sent on Saturday, Sunday is skipped)
+        const now = moment().utcOffset('-06:00');
+        const dayOfWeek = now.day(); // 0: Sunday, 6: Saturday
+
+        let daysToAdd = 1;
+        if (dayOfWeek === 6) {
+            daysToAdd = 2; // On Saturday, send for Monday
+        } else if (dayOfWeek === 0) {
+            console.log('Skipping Sunday run. Monday reminders were sent on Saturday.');
+            return res.status(200).json({ message: 'Skipping Sunday run. Monday reminders were sent on Saturday.' });
+        }
+
+        const timeMin = now.clone().add(daysToAdd, 'days').startOf('day').toISOString();
+        const timeMax = now.clone().add(daysToAdd, 'days').endOf('day').toISOString();
 
         const events = await calendar.getEvents(timeMin, timeMax);
 

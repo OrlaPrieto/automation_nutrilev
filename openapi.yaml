@@ -1,0 +1,171 @@
+openapi: 3.0.0
+info:
+  title: Automation Nutrilev API
+  version: 1.0.0
+  description: API documentation for the Nutrilev automation system including cron jobs, manual emails, and webhook handlers for patient reminders.
+servers:
+  - url: /
+    description: Base URL
+components:
+  securitySchemes:
+    SecretQueryParam:
+      type: apiKey
+      in: query
+      name: secret
+      description: Secret key required for cron jobs and manual tasks.
+security:
+  - SecretQueryParam: []
+paths:
+  /api/cron:
+    get:
+      summary: Daily Reminders Cron Job
+      description: Retrieves tomorrow's events from Google Calendar and dispatches standard appointment reminders via the configured strategy (Email/WhatsApp/SMS).
+      responses:
+        '200':
+          description: Reminders processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+  /api/cron-30min:
+    get:
+      summary: Urgent 30-min Reminders Cron Job
+      description: Fetches events starting within 25 to 40 minutes and dispatches urgent reminders. Avoids duplicate sends using Redis.
+      responses:
+        '200':
+          description: Urgent reminders processed successfully
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+  /api/send-email:
+    post:
+      summary: Send Manual Reminder Email
+      description: Manually triggers an email reminder. You can provide an `eventId` to fetch details from calendar, or provide custom details.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                eventId:
+                  type: string
+                  description: Google Calendar Event ID. If provided, other fields are auto-filled.
+                email:
+                  type: string
+                  description: Recipient email address.
+                patientName:
+                  type: string
+                  description: Patient's name.
+                time:
+                  type: string
+                  description: Time of the appointment (e.g. "6:00 PM").
+                urgent:
+                  type: boolean
+                  description: If true, sends the urgent template instead of the standard one.
+      responses:
+        '200':
+          description: Email sent successfully
+        '400':
+          description: Bad Request (missing or invalid email/name/time)
+        '404':
+          description: Event not found
+        '500':
+          description: Server Error
+  /api/list-events:
+    get:
+      summary: List Upcoming Events
+      description: Lists Google Calendar events starting from today up to a specified number of days.
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 1
+          description: Number of days ahead to fetch events for.
+      responses:
+        '200':
+          description: A JSON array of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  timeWindow:
+                    type: object
+                  events:
+                    type: array
+                    items:
+                      type: object
+  /api/webhook:
+    get:
+      summary: Handle Email Actions & WhatsApp Verification
+      security: [] # Webhook does not require secret query
+      description: Handles confirmation/cancellation clicks from emails OR WhatsApp Webhook verification.
+      parameters:
+        - in: query
+          name: action
+          schema:
+            type: string
+            enum: [CONFIRM, CANCEL]
+          description: The action the user chose via email link.
+        - in: query
+          name: eventId
+          schema:
+            type: string
+          description: The Google Calendar Event ID to update.
+        - in: query
+          name: hub.mode
+          schema:
+            type: string
+          description: Verification parameter from WhatsApp/Meta.
+        - in: query
+          name: hub.verify_token
+          schema:
+            type: string
+          description: Custom verification token from WhatsApp/Meta.
+        - in: query
+          name: hub.challenge
+          schema:
+            type: string
+          description: Challenge string returned by WhatsApp/Meta.
+      responses:
+        '200':
+          description: HTML response for email clicks OR Challenge text for WhatsApp verification.
+        '403':
+          description: Verification failed correctly
+        '500':
+          description: Error processing action
+    post:
+      summary: Handle WhatsApp Button Clicks
+      security: []
+      description: Receives WhatsApp webhook events when a user taps the Confirm or Cancel buttons on a Twilio interactive template.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ButtonText:
+                  type: string
+                  description: Text of the button pressed (e.g. "Confirmar").
+                From:
+                  type: string
+                  description: Phone number in WhatsApp format ("whatsapp:+123456789").
+      responses:
+        '200':
+          description: OK
