@@ -18,9 +18,10 @@ module.exports = async function handler(req, res) {
                     const event = await calendar.getEvent(eventId);
                     const currentColor = event.colorId;
                     
-                    // Si Menta '2' (Salvia), cambiar a Morado '3' (Uva)
-                    // Si Gris '8' (Grafito) u otro, cambiar a Verde musgo '10' (Albahaca)
-                    if (currentColor === '2') {
+                    // Regla de cita pagada:
+                    // Si es Verde Esmeralda/Menta ('7' o '2'), cambiar a Morado '3' (Uva)
+                    // Si es otro, cambiar a Verde musgo '10' (Albahaca)
+                    if (currentColor === '2' || currentColor === '7') {
                         colorId = '3';
                     } else {
                         colorId = '10';
@@ -74,8 +75,8 @@ module.exports = async function handler(req, res) {
                 const currentColor = event.colorId;
                 
                 let colorId = '10'; // Default Verde Musgo (Albahaca)
-                if (currentColor === '2') {
-                    colorId = '3'; // Menta (2) -> Morado (3)
+                if (currentColor === '2' || currentColor === '7') {
+                    colorId = '3'; // Verde Esmeralda/Menta ('2' o '7') -> Morado (3)
                 }
                 
                 await calendar.updateEventColor(eventId, colorId);
