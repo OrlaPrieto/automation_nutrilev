@@ -42,6 +42,13 @@ module.exports = async function handler(req, res) {
 
         // 3. Process each event
         for (const event of events) {
+            // Skip cancelled events (colorId '11')
+            if (event.colorId === '11') {
+                console.log(`[SKIP] Skipping cancelled event (ID: ${event.id}, summary: ${event.summary || 'N/A'})`);
+                results.push({ patient: event.summary, status: 'skipped - cancelled event' });
+                continue;
+            }
+
             let contact = event.description;
             
             // Fallback to searching attendees if description is empty

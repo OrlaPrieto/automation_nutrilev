@@ -54,6 +54,20 @@ async function updateEventColor(eventId, colorId) {
 }
 
 /**
+ * Update color and description of a Google Calendar event.
+ */
+async function updateEventColorAndDescription(eventId, colorId, description) {
+    const auth = getGoogleAuth();
+    const calendar = google.calendar({ version: 'v3', auth });
+
+    await calendar.events.patch({
+        calendarId: config.google.calendarId,
+        eventId,
+        requestBody: { colorId, description }
+    });
+}
+
+/**
  * Get a specific event by ID.
  */
 async function getEvent(eventId) {
@@ -72,4 +86,5 @@ module.exports = {
     getEvents,
     getEvent,
     updateEventColor,
+    updateEventColorAndDescription,
 };

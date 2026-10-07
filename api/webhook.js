@@ -13,24 +13,35 @@ module.exports = async function handler(req, res) {
         if (action && eventId) {
             console.log(`Received email action: ${action} for eventId: ${eventId}`);
             try {
+                const actionUpper = action.toUpperCase();
+                const isConfirm = actionUpper === 'CONFIRM';
                 let colorId = '11'; // Default cancel (Red)
-                if (action === 'CONFIRM') {
+
+                if (isConfirm) {
                     const event = await calendar.getEvent(eventId);
                     const currentColor = event.colorId;
+                    const currentDescription = event.description || '';
                     
                     // Regla de cita pagada:
                     // Si es Verde Esmeralda/Menta ('7' o '2'), cambiar a Morado '3' (Uva)
                     // Si es otro, cambiar a Verde musgo '10' (Albahaca)
-                    if (currentColor === '2' || currentColor === '7') {
+                    if (currentColor === '2' || currentColor === '7' || currentColor === '3') {
                         colorId = '3';
                     } else {
                         colorId = '10';
                     }
+
+                    const note = '\n\n[Cita confirmada mediante correo electrónico Nutrilev]';
+                    const newDescription = currentDescription.includes('[Cita confirmada')
+                        ? currentDescription
+                        : (currentDescription.trim() + note).trim();
+
+                    await calendar.updateEventColorAndDescription(eventId, colorId, newDescription);
+                } else {
+                    colorId = '11';
+                    await calendar.updateEventColor(eventId, colorId);
                 }
 
-                await calendar.updateEventColor(eventId, colorId);
-
-                const isConfirm = action === 'CONFIRM';
                 return res.status(200).send(renderResponseHtml(isConfirm));
             } catch (error) {
                 console.error('Error processing email action:', error.message);
@@ -73,13 +84,19 @@ module.exports = async function handler(req, res) {
             if (buttonText.includes('confirmar')) {
                 const event = await calendar.getEvent(eventId);
                 const currentColor = event.colorId;
+                const currentDescription = event.description || '';
                 
                 let colorId = '10'; // Default Verde Musgo (Albahaca)
-                if (currentColor === '2' || currentColor === '7') {
+                if (currentColor === '2' || currentColor === '7' || currentColor === '3') {
                     colorId = '3'; // Verde Esmeralda/Menta ('2' o '7') -> Morado (3)
                 }
+
+                const note = '\n\n[Cita confirmada mediante WhatsApp Nutrilev]';
+                const newDescription = currentDescription.includes('[Cita confirmada')
+                    ? currentDescription
+                    : (currentDescription.trim() + note).trim();
                 
-                await calendar.updateEventColor(eventId, colorId);
+                await calendar.updateEventColorAndDescription(eventId, colorId, newDescription);
                 await redis.del(`cita:${phoneNumber}`);
             } else if (buttonText.includes('cancelar')) {
                 await calendar.updateEventColor(eventId, '11');

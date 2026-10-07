@@ -22,12 +22,24 @@ module.exports = async function handler(req, res) {
 
         const events = await calendar.getEvents(timeMin, timeMax);
 
-        const summary = events.map(event => ({
-            id: event.id,
-            summary: event.summary,
-            start: event.start.dateTime || event.start.date,
-            contact: event.description || (event.attendees ? event.attendees.find(a => !a.self)?.email : 'N/A')
-        }));
+        const summary = events.map(event => {
+            let status = 'pending';
+            const colorId = event.colorId;
+            if (colorId === '3' || colorId === '10') {
+                status = 'confirmed';
+            } else if (colorId === '11') {
+                status = 'cancelled';
+            }
+
+            return {
+                id: event.id,
+                summary: event.summary,
+                status,
+                colorId,
+                start: event.start.dateTime || event.start.date,
+                contact: event.description || (event.attendees ? event.attendees.find(a => !a.self)?.email : 'N/A')
+            };
+        });
 
         return res.status(200).json({
             count: events.length,
