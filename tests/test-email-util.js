@@ -27,6 +27,21 @@ const tests = [
     desc: 'Standard Name <email> format'
   },
   {
+    input: 'mary1+alias@gmail.com',
+    expected: 'mary1+alias@gmail.com',
+    desc: 'Email with plus alias'
+  },
+  {
+    input: 'El correo es mary1.romol@gmail.com.',
+    expected: 'mary1.romol@gmail.com',
+    desc: 'Email with trailing period'
+  },
+  {
+    input: 'mary1.romol@gmail.com\n[Notificado 30m]',
+    expected: 'mary1.romol@gmail.com',
+    desc: 'Email with note on next line'
+  },
+  {
     input: 'No email here',
     expected: null,
     desc: 'No email address'

@@ -4,10 +4,12 @@ const config = require('../config');
  * Generates an HTML email for appointment confirmation.
  */
 function generateEmailHtml({ patientName, time, event, confirmUrl, cancelUrl, calendarLink, whatsappUrl, targetDay = 'mañana' }) {
-    const location = event?.location || config.clinic.location || 'Consultorio Nutrilev';
     const rawSummary = event?.summary || '';
     const isVirtual = /virtual/i.test(rawSummary);
     const modality = isVirtual ? 'Virtual' : 'Presencial';
+    const location = isVirtual
+        ? (event?.hangoutLink || 'En línea / Google Meet')
+        : (event?.location || config.clinic.location || 'Consultorio Nutrilev');
     
     const matchSession = rawSummary.match(/(\d+)\/(\d+)/);
     const sessionText = matchSession ? `Cita ${matchSession[1]} de ${matchSession[2]}` : 'Cita regular';

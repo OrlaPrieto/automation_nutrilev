@@ -4,18 +4,23 @@ const config = require('../config');
  * Generates an HTML email for urgent appointment reminders (e.g. 30 mins before)
  */
 function generateUrgentEmailHtml({ patientName, time, event, calendarLink, whatsappUrl }) {
-    const location = event?.location || config.clinic.location || 'Consultorio Nutrilev';
     const rawSummary = event?.summary || '';
     const isVirtual = /virtual/i.test(rawSummary);
     const modality = isVirtual ? 'Virtual' : 'Presencial';
+    const location = isVirtual
+        ? (event?.hangoutLink || 'En línea / Google Meet')
+        : (event?.location || config.clinic.location || 'Consultorio Nutrilev');
     
     const matchSession = rawSummary.match(/(\d+)\/(\d+)/);
     const sessionText = matchSession ? `Cita ${matchSession[1]} de ${matchSession[2]}` : 'Cita regular';
     
     const eventTitle = rawSummary.replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim() || 'Cita';
 
-    // Make a Google Maps link search for the location
-    const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+    // Map link for in-person, or meeting link for virtual
+    const actionUrl = isVirtual && event?.hangoutLink
+        ? event.hangoutLink
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+    const actionText = isVirtual ? '🖥 Acceder a la sesión' : '📍 Abrir en Google Maps';
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -36,13 +41,13 @@ function generateUrgentEmailHtml({ patientName, time, event, calendarLink, whats
     <p style="margin:0 0 24px;color:#e91e8c;font-size:16px;font-weight:bold;">¡Te esperamos en aproximadamente 30 minutos!</p>
     <p style="margin:0 0 32px;color:#6b7280;font-size:15px;line-height:1.7;">Queremos asegurarnos de que llegues sin problemas. Aquí tienes las indicaciones:</p>
 
-    <!-- Detalles con el Mapa -->
+    <!-- Detalles con el Mapa / Enlace -->
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fef2f8;border-radius:12px;margin-bottom:32px;">
     <tr><td style="padding:28px;text-align:center;">
-        <p style="margin:0 0 8px;color:#6b7280;font-size:14px;text-transform:uppercase;letter-spacing:1px;">Ubicación de tu cita</p>
+        <p style="margin:0 0 8px;color:#6b7280;font-size:14px;text-transform:uppercase;letter-spacing:1px;">${isVirtual ? 'Modalidad de tu cita' : 'Ubicación de tu cita'}</p>
         <p style="margin:0 0 20px;color:#1a1a2e;font-size:18px;font-weight:700;">${location}</p>
         
-        <a href="${mapSearchUrl}" style="display:inline-block;background-color:#1a1a2e;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:50px;font-size:15px;font-weight:600;">📍 Abrir en Google Maps</a>
+        <a href="${actionUrl}" style="display:inline-block;background-color:#1a1a2e;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:50px;font-size:15px;font-weight:600;">${actionText}</a>
     </td></tr>
     </table>
 
