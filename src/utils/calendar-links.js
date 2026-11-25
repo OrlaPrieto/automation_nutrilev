@@ -11,8 +11,8 @@ function generateCalendarLink(event) {
             .replace(/\.\d{3}/, '');
     }
 
-    const start = formatDate(event.start?.dateTime || event.start?.date);
-    const end = formatDate(event.end?.dateTime || event.end?.date);
+    const start = formatDate(event.start.dateTime || event.start.date);
+    const end = formatDate(event.end.dateTime || event.end.date);
 
     const params = new URLSearchParams({
         action: 'TEMPLATE',

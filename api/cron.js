@@ -2,7 +2,6 @@ const moment = require('moment');
 const calendar = require('../src/services/google-calendar');
 const ReminderFactory = require('../src/reminders/factory');
 const config = require('../src/config');
-const redis = require('../src/services/redis');
 const { extractEmail } = require('../src/utils/email');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -11,18 +10,10 @@ module.exports = async function handler(req, res) {
         return res.status(405).send('Method Not Allowed');
     }
 
-    // Protect endpoint with a cron secret if configured (supports query param or Vercel Cron Bearer header)
-    const authHeader = req.headers.authorization;
-    const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-    const isQuerySecret = req.query.secret === process.env.CRON_SECRET;
-
-    if (process.env.CRON_SECRET && !isVercelCron && !isQuerySecret) {
-        return res.status(401).send('Unauthorized');
-    }
-
     console.log(`[${moment().format()}] Running appointment reminders job...`);
 
     try {
+        // 1. Get tomorrow's events (forcing Mexico City time for calculation)
         // 1. Determine target date (Monday reminders are sent on Saturday, Sunday is skipped)
         const now = moment().utcOffset('-06:00');
         const dayOfWeek = now.day(); // 0: Sunday, 6: Saturday
@@ -58,62 +49,47 @@ module.exports = async function handler(req, res) {
                 continue;
             }
 
-            // Skip all-day or untimed events (e.g. reminders, personal goals like "BAJAR DE PESO")
-            if (!event.start || !event.start.dateTime) {
-                console.log(`[SKIP] Skipping all-day or untimed event (ID: ${event.id}, summary: ${event.summary || 'N/A'})`);
-                results.push({ patient: event.summary, status: 'skipped - all-day/untimed event' });
-                continue;
-            }
-
-            // Extract email with smart fallback (description -> attendee -> summary)
-            let email = extractEmail(event.description);
-            if (!email && event.attendees && event.attendees.length > 0) {
+            let contact = event.description;
+            
+            // Fallback to searching attendees if description is empty
+            if (!contact && event.attendees && event.attendees.length > 0) {
                 const nonSelfAttendee = event.attendees.find(a => !a.self && a.email && !a.email.includes('resource.calendar'));
-                if (nonSelfAttendee) email = extractEmail(nonSelfAttendee.email);
-            }
-            if (!email && event.summary) {
-                email = extractEmail(event.summary);
+                if (nonSelfAttendee) contact = nonSelfAttendee.email;
             }
 
             const patientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
-            const startTime = moment(event.start.dateTime)
+            const startTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
                 .format('h:mm A');
 
-            // Prevent duplicate reminder sends (expires in 24 hours)
-            const sentKey = `reminder_sent_${event.id}`;
-            const alreadySent = await redis.get(sentKey);
-
-            if (alreadySent) {
-                console.log(`Skipping event ${event.id}, reminder already sent.`);
-                results.push({ patient: patientName, status: 'skipped - already sent' });
-                continue;
-            }
-
-            console.log(`[${moment().format('HH:mm:ss')}] Processing: ${patientName} (${email || 'No email'}) email... [ID: ${event.id}]`);
+            console.log(`[${moment().format('HH:mm:ss')}] Processing: ${patientName} (${contact || 'No contact info'}) email... [ID: ${event.id}]`);
             
-            if (!email) {
+            if (!contact) {
                 console.warn(`[WARN] Skipping "${patientName}": No email found.`);
                 results.push({ patient: patientName, status: `skipped - no contact info` });
                 continue;
             }
 
+            if (!contact.includes('@')) {
+                console.warn(`[WARN] Skipping "${patientName}": Invalid email format "${contact}"`);
+                results.push({ patient: patientName, status: `skipped - invalid contact` });
+                continue;
+            }
+
             try {
+                // Clean contact email if it exists
+                const cleanContact = extractEmail(contact);
                 const targetDay = (dayOfWeek === 6) ? 'el lunes' : 'mañana';
 
                 // Add a small delay between sends to avoid rate limits
                 if (results.length > 0) await sleep(500);
 
-                const response = await strategy.send(email, patientName, startTime, event.id, event, targetDay);
-                console.log(`[OK] Sent to ${patientName} (${email}). Resend ID: ${response?.id || 'N/A'}`);
-
-                // Mark as sent in Redis (expires in 24 hours)
-                await redis.set(sentKey, 'true', { ex: 86400 });
-
-                results.push({ patient: patientName, contact: email, status: 'sent', resendId: response?.id });
+                const response = await strategy.send(cleanContact || contact, patientName, startTime, event.id, event, targetDay);
+                console.log(`[OK] Sent to ${patientName} (${cleanContact || contact}). Resend ID: ${response?.id || 'N/A'}`);
+                results.push({ patient: patientName, contact: cleanContact || contact, status: 'sent', resendId: response?.id });
             } catch (err) {
-                console.error(`[ERROR] Failed for ${patientName} (${email}):`, err.message);
-                results.push({ patient: patientName, contact: email, status: 'error', error: err.message });
+                console.error(`[ERROR] Failed for ${patientName} (${contact}):`, err.message);
+                results.push({ patient: patientName, contact, status: 'error', error: err.message });
             }
         }
 

@@ -11,12 +11,8 @@ module.exports = async function handler(req, res) {
         return res.status(405).send('Method Not Allowed');
     }
 
-    // Protect endpoint with a cron secret (supports query param or Vercel Cron Bearer header)
-    const authHeader = req.headers.authorization;
-    const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-    const isQuerySecret = req.query.secret === process.env.CRON_SECRET;
-
-    if (!isVercelCron && !isQuerySecret) {
+    // Protect endpoint with a cron secret so not anyone can trigger it
+    if (req.query.secret !== process.env.CRON_SECRET) {
         return res.status(401).send('Unauthorized');
     }
 
@@ -49,25 +45,16 @@ module.exports = async function handler(req, res) {
                 continue;
             }
 
-            // Skip all-day or untimed events (e.g. reminders, personal goals like "BAJAR DE PESO")
-            if (!event.start || !event.start.dateTime) {
-                console.log(`[SKIP] Skipping all-day or untimed event (ID: ${event.id}, summary: ${event.summary || 'N/A'})`);
-                results.push({ patient: event.summary, status: 'skipped - all-day/untimed event' });
-                continue;
-            }
-
-            // Extract email with smart fallback (description -> attendee -> summary)
-            let email = extractEmail(event.description);
-            if (!email && event.attendees && event.attendees.length > 0) {
+            let contact = event.description;
+            
+            // Fallback to searching attendees if description is empty
+            if (!contact && event.attendees && event.attendees.length > 0) {
                 const nonSelfAttendee = event.attendees.find(a => !a.self && a.email && !a.email.includes('resource.calendar'));
-                if (nonSelfAttendee) email = extractEmail(nonSelfAttendee.email);
-            }
-            if (!email && event.summary) {
-                email = extractEmail(event.summary);
+                if (nonSelfAttendee) contact = nonSelfAttendee.email;
             }
 
             const patientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
-            const startTime = moment(event.start.dateTime)
+            const startTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
                 .format('h:mm A');
 
@@ -81,11 +68,17 @@ module.exports = async function handler(req, res) {
                 continue;
             }
 
-            console.log(`[${moment().format('HH:mm:ss')}] Processing urgent: ${patientName} (${email || 'No email'}) email... [ID: ${event.id}]`);
+            console.log(`[${moment().format('HH:mm:ss')}] Processing urgent: ${patientName} (${contact}) email... [ID: ${event.id}]`);
 
-            if (!email) {
+            if (!contact) {
                 console.warn(`[WARN] Skipping urgent "${patientName}": No email found.`);
                 results.push({ patient: patientName, status: `skipped - no contact info` });
+                continue;
+            }
+
+            if (!contact.includes('@')) {
+                console.warn(`[WARN] Skipping urgent "${patientName}": Invalid email format "${contact}"`);
+                results.push({ patient: patientName, status: `skipped - invalid contact` });
                 continue;
             }
 
@@ -96,19 +89,22 @@ module.exports = async function handler(req, res) {
             }
 
             try {
+                // Clean contact email if it exists
+                const cleanContact = extractEmail(contact);
+
                 // Add a small delay between sends to avoid rate limits
                 if (results.length > 0) await sleep(500);
 
-                const response = await strategy.sendUrgent(email, patientName, startTime, event.id, event);
-                console.log(`[OK] Sent urgent to ${patientName} (${email}). Resend ID: ${response?.id || 'N/A'}`);
+                const response = await strategy.sendUrgent(cleanContact || contact, patientName, startTime, event.id, event);
+                console.log(`[OK] Sent urgent to ${patientName} (${cleanContact || contact}). Resend ID: ${response?.id || 'N/A'}`);
 
                 // Mark as sent in Redis (expires in 2 hours)
                 await redis.set(sentKey, 'true', { ex: 7200 });
 
-                results.push({ patient: patientName, contact: email, status: 'sent urgent', resendId: response?.id });
+                results.push({ patient: patientName, contact: cleanContact || contact, status: 'sent urgent', resendId: response?.id });
             } catch (err) {
-                console.error(`[ERROR] Failed urgent for ${patientName} (${email}):`, err.message);
-                results.push({ patient: patientName, contact: email, status: 'error', error: err.message });
+                console.error(`[ERROR] Failed urgent for ${patientName} (${contact}):`, err.message);
+                results.push({ patient: patientName, contact, status: 'error', error: err.message });
             }
         }
 

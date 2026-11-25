@@ -9,8 +9,8 @@
 function extractEmail(text) {
   if (!text || typeof text !== 'string') return null;
   
-  // Regex to match email addresses cleanly (supports +, %, letters-only TLD, avoids trailing punctuation)
-  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/;
+  // Regex to match email addresses
+  const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/;
   const match = text.match(emailRegex);
   
   return match ? match[0].trim() : null;

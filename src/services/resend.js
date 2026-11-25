@@ -12,7 +12,7 @@ class ResendService {
             to,
             subject,
             html,
-            replyTo: config.resend.replyTo,
+            reply_to: config.resend.replyTo,
         });
 
         if (error) {

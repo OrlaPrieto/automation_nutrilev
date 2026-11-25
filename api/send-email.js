@@ -33,16 +33,13 @@ module.exports = async function handler(req, res) {
             }
 
             // Extract contact
-            let extracted = extractEmail(event.description);
-            if (!extracted && event.attendees && event.attendees.length > 0) {
+            let contact = event.description;
+            if (!contact && event.attendees && event.attendees.length > 0) {
                 const nonSelfAttendee = event.attendees.find(a => !a.self && a.email && !a.email.includes('resource.calendar'));
-                if (nonSelfAttendee) extracted = extractEmail(nonSelfAttendee.email);
-            }
-            if (!extracted && event.summary) {
-                extracted = extractEmail(event.summary);
+                if (nonSelfAttendee) contact = nonSelfAttendee.email;
             }
 
-            finalEmail = extracted || event.description;
+            finalEmail = extractEmail(contact) || contact;
             finalPatientName = (event.summary || '').replace(/\s*\(\d+\)\s*/g, '').replace(/virtual/ig, '').replace(/\s*\d+\/\d+\s*/g, '').trim();
             finalTime = moment(event.start.dateTime || event.start.date)
                 .utcOffset('-06:00')
